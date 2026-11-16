@@ -265,23 +265,21 @@ export default class Board extends View {
     const from = this.pressed === null ? -1 : lane.findIndex(c => c.address === this.pressed);
     const here = lane.findIndex(c => c.address === a.address);
     const dragging = this.pressed !== null && this.over !== null && this.over !== this.pressed;
-    // Label row. No flex_1: the badge hugs its text instead of growing to the lane.
-    const label = h_flex().items_center().flex_none()
+    // The name is the only part that shrinks. The close mark is pinned to the card, not this row,
+    // so a long title cannot push it past the edge.
+    const label = h_flex().items_center().min_w(0).max_w(196).flex_shrink_1().pr(18)
       .child(div().flex_none().ml(6).tooltip(a.program?.name ?? "Agent").child(icon(t, a.program, 12)))
       .when(Boolean(machine), el => el.child(div().flex_none().ml(4).tooltip(machineLabel(machine))
         .child(svg("mods/board-side/server.svg").size(10).text_color(t.accent))))
       .when(active, el => el.child(div().flex_none().ml(4).tooltip("Showing in the terminal area")
         .child(svg("mods/board-side/eye.svg").size(11).text_color(t.accent))))
-      .child(div().max_w(148).min_w(0).ml(5).mr(2).text_size(11).truncate()
+      .child(div().min_w(0).flex_shrink_1().ml(5).mr(2).text_size(11).truncate()
         .text_color(active ? t.accent : t.foreground)
         .when(active, d => d.font_semibold())
         .child(sessionName(a)))
       .when(mins >= 1, el => el.child(div().flex_none().text_size(10).text_color(t.dim).child(elapsed)))
       .when(!note, el => el.child(glyph(`notebtn-${a.address}`, "note", 11, "Add a note",
-        t.dim, t.hover, t.foreground, () => editNote(a))))
-      .child(glyph(`close-${a.address}`, "x", 10, "Close this session",
-        t.dim, tint(t.blocked, "22"), t.blocked, () => closeSession(a)))
-      .child(div().w(2).flex_none());
+        t.dim, t.hover, t.foreground, () => editNote(a))));
     // Note sits under the label and only as wide as its own text. Built only when there is one:
     // child() rejects an empty value, and that was taking the whole board down.
     const noteLine = note ? h_flex().id(`card-note-${a.address}`).ml(23).mr(8).mb(5).h(16).px(5).gap(3)
@@ -292,7 +290,7 @@ export default class Board extends View {
       .on_click((_e, cx) => { cx.stop_propagation(); editNote(a); })
       .child(svg("mods/board-side/note.svg").size(10).flex_none())
       .child(div().max_w(132).min_w(0).truncate().child(note)) : null;
-    return h_flex().id(`agent-${a.address}`).relative().max_w(220).flex_none().flex_shrink_0()
+    return h_flex().id(`agent-${a.address}`).relative().max_w(220).min_w(0).flex_shrink_1()
       .rounded(6).overflow_hidden()
       .when(!note, el => el.h(26).items_center())
       .when(dragging && this.pressed === a.address, el => el.opacity(0.45))
@@ -316,7 +314,9 @@ export default class Board extends View {
       .tooltip(tip)
       .on_click(() => { run("agent.focus", { terminal: a.address }); if (terminalsMinimized()) toggleTerminals(); })
       .child(div().w(3).h_full().bg(color).flex_none())
-      .child(noteLine ? v_flex().flex_none().min_w(0).child(label).child(noteLine) : label);
+      .child(noteLine ? v_flex().min_w(0).flex_shrink_1().child(label).child(noteLine) : label)
+      .child(glyph(`close-${a.address}`, "x", 10, "Close this session",
+        t.dim, tint(t.blocked, "22"), t.blocked, () => closeSession(a)).absolute().right(1).top(5));
   }
 
   // One tab in the strip above the terminals: what runs there, its machine, status and a close.
