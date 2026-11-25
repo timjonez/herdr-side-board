@@ -32,7 +32,7 @@ The Terminals chip, and the left chevron on the tab strip, hide the left column 
 
 The tab strip lists every unsettled tab. Dragging reorders it. Its plus starts a terminal in the shown space. Its × settles an agent tab, so the session stays on the board, or closes a plain terminal.
 
-New opens `board-new` as a 320×520 popup: pick a machine, then a terminal or an installed agent. History opens `board-history` as a 680×600 dialog. It runs `python3` on each connected machine and reads that machine's Claude Code and OpenCode session files so you can reopen one where it ran. It does not send those files anywhere. The program chip cycles a filter on the agent's program name, kept in `board.program`.
+New opens `board-side-new` as a 320×520 popup: pick a machine, then a terminal or an installed agent. History opens `board-side-history` as a 680×600 dialog. It runs `python3` on each connected machine and reads that machine's Claude Code and OpenCode session files so you can reopen one where it ran. It does not send those files anywhere. The program chip cycles a filter on the agent's program name, kept in `board.program`.
 
 ## Built from
 
@@ -40,7 +40,9 @@ New opens `board-new` as a 320×520 popup: pick a machine, then a terminal or an
 
 `mods/board-side` draws every role. The unroled copy draws the lanes. It calls `agents`, `spaces`, `panes`, `machines`, `theme`, `shared`, `setShared`, `layout`, `run`, `openOverlay`, `setAgentOrder`, `nextCommand`, and `window`. Commands: `layout.show`, `layout.hide`, `layout.toggle`, `layout.resize`, `agent.focus`, `space.select`, `tab.select`, `tab.new`, `tab.settle`, `tab.close`, `pane.close`, `space.new`, `app.settings`, `window.minimize`, `window.maximize`, `window.close`. Art is the SVG files in `mods/board-side/`.
 
-`board-new` calls `knownAgents`, `run`, and `shared` `board.lastSpace`. `board-note` edits `board.notes`. `board-history` calls `exec("python3", ["-c", SCRIPT], { on })` and embeds `sessions.py` as `SCRIPT`. Overlay icons use `mods/board-side/`, not `mods/board/`. Closing a busy session opens the shipped `confirm` mod. `keys.json` binds `ctrl-shift-m` to `board-side.note`.
+Adjacent lanes share a draggable divider. Dragging transfers height between those two lanes while keeping their headers visible; double-clicking any divider resets all four heights. The saved proportions live in `board.laneWeights`.
+
+`board-side-new` calls `knownAgents`, `run`, and `shared` `board.lastSpace`. `board-side-note` edits `board.notes`. `board-side-history` calls `exec("python3", ["-c", SCRIPT], { on })` and embeds `sessions.py` as `SCRIPT`. Overlay icons use `mods/board-side/`, not `mods/board/`. Closing a busy session opens the shipped `confirm` mod. `keys.json` binds `ctrl-shift-m` to `board-side.note`.
 
 ## Watch out
 

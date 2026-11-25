@@ -83,7 +83,7 @@ export default class BoardNew extends View {
       : this.agents[where] === null ? "Checking installed agents…"
       : installed.length === 0 ? "No agents installed there" : null;
     return v_flex().w_full().bg(t.popover).p(6).gap(2).text_size(12.8)
-      .id("board-new").track_focus(this.handle)
+      .id("board-side-new").track_focus(this.handle)
       .on_key_down((e, cx) => {
         if (e.modifiers.control || e.modifiers.platform || e.modifiers.alt) return;
         const i = all.indexOf(m);

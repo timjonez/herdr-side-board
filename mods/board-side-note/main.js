@@ -36,7 +36,7 @@ export default class BoardNote extends View {
       .border_1().border_color(primary ? t.solid : t.input).bg(primary ? t.solid : t.raised)
       .text_color(primary ? t.solid_foreground : t.foreground).text_size(12).font_medium().cursor_pointer()
       .hover(s => s.opacity(0.88)).on_click(action).child(text);
-    return v_flex().id("board-note").track_focus(this.handle)
+    return v_flex().id("board-side-note").track_focus(this.handle)
       .on_key_down((e, cx) => { if (e.key === "escape") { closeOverlay(p.overlay); cx.stop_propagation(); } })
       .w_full().p(16).gap(10).bg(t.popover).text_color(t.foreground)
       .child(h_flex().items_center().gap(8)
