@@ -1,6 +1,6 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { agents, spaces, panes, props, run, setAgentOrder, theme, shared, setShared, layout, openOverlay, window, machines, nextCommand } from "herdr";
+import { agents, spaces, panes, props, run, setAgentOrder, theme, shared, setShared, layout, openOverlay, window, machines, nextCommand, settings } from "herdr";
 
 const STATES = [
   { key: "blocked", label: "Needs you" },
@@ -142,7 +142,7 @@ function closeSession(a) {
 // Sticky notes on sessions, keyed by terminal address (survives pane moves and restarts).
 const notes = () => shared("board.notes") ?? {};
 function editNote(a) {
-  openOverlay({ mod: "board-note", kind: "dialog", width: 400, height: 250,
+  openOverlay({ mod: "board-side-note", kind: "dialog", width: 400, height: 250,
     props: { address: a.address, name: sessionName(a) } });
 }
 // A note goes when its session does. Only judge a machine whose sessions are listed,
@@ -205,7 +205,7 @@ function currentSession() {
   const focusedPane = panes().find(p => p.tab === tab?.id && p.focused)?.pane;
   return list.find(a => a.focused) ?? inTab.find(a => a.pane === focusedPane) ?? inTab[0] ?? null;
 }
-// keys.json "board.note": every copy of this mod (header, board, bars) hears it; one acts.
+// keys.json "board-side.note": every copy of this mod (header, board, bars) hears it; one acts.
 let lastNoteKey = 0;
 function noteShortcut() {
   if (Date.now() - lastNoteKey < 500) return;
@@ -233,6 +233,17 @@ function moveCard(column, from, to) {
   setShared("board.order", [...ids, ...savedOrder().filter(addr => !ids.includes(addr) && live.has(addr))]);
 }
 
+// Lane heights, set by dragging the handles between lanes: one weight per lane, in STATES order.
+// A double-click on a handle shares the rail evenly again.
+const LANE_MIN = 40;   // px: a lane never shrinks past its header
+const HANDLE = 10;     // px: the gap between lanes, which is also the grab area
+const PAD_Y = 12;
+const laneWeights = () => {
+  const w = shared("board.laneWeights");
+  return Array.isArray(w) && w.length === STATES.length && w.every(x => Number.isFinite(x) && x > 0)
+    ? w : STATES.map(() => 1);
+};
+
 export default class Board extends View {
   init(_p, cx) {
     this.observed = {};
@@ -241,6 +252,8 @@ export default class Board extends View {
     cx.spawn(async () => { for (;;) { if (await nextCommand() === "note") noteShortcut(); } });
     this.tabOver = null;
     this.over = null;    // the card it would drop on
+    this.resize = null;  // a lane handle being dragged: { i, y, weights }
+    this.lanesHeight = 0;
     cx.timer.every(30000, (cx) => cx.notify());
   }
   card(t, a, color, lane) {
@@ -399,10 +412,10 @@ export default class Board extends View {
           .bg(t.accent).text_color(t.accent_foreground ?? t.background).text_size(12).font_semibold()
           .hover(s => s.opacity(0.9))
           .on_mouse_down("left", stop)
-          .on_click(() => openOverlay({ mod: "board-new", kind: "popup", width: 320, height: 520 }))
+          .on_click(() => openOverlay({ mod: "board-side-new", kind: "popup", width: 320, height: 520 }))
           .child(svg("mods/board-side/plus.svg").size(13)).child("New"))
         .child(button(t, "history", "history", "Session history: find and reopen past sessions",
-          () => openOverlay({ mod: "board-history", kind: "dialog", width: 680, height: 600 })))
+          () => openOverlay({ mod: "board-side-history", kind: "dialog", width: 680, height: 600 })))
         .child(button(t, "settings", "settings", "Settings", () => run("app.settings")))
         .when(w?.buttons, el => el
           .child(div().w(1).h(18).mx(4).bg(t.border))
@@ -463,13 +476,31 @@ export default class Board extends View {
     setAgentOrder(STATES.flatMap(s => sortCards(shown.filter(a => a.status === s.key)).map(a => a.address)));
     const endDrag = (_e, cx) => { if (this.pressed !== null) { this.pressed = null; this.over = null; cx.notify(); } };
     // Lanes stack top to bottom and share the full rail, even when a lane has no badges.
-    return v_flex().id("board-lanes").size_full().min_h(0).overflow_hidden().px(14).py(12).gap(10).bg(t.canvas)
-      .on_mouse_up("left", endDrag)
-      .on_hover((hovered, cx) => { if (!hovered) endDrag(null, cx); })
-      .children(STATES.map(state => {
+    // Their shares come from laneWeights(); the handles between them move that share.
+    const weights = this.resize?.weights ?? laneWeights();
+    const zoom = Number(settings()?.zoom) || 1;
+    const endResize = (cx) => {
+      if (!this.resize) return;
+      setShared("board.laneWeights", this.resize.weights);
+      this.resize = null;
+      cx.notify();
+    };
+    const handle = (i) => div().id(`lane-handle-${i}`).w_full().h(HANDLE).flex_none().flex().items_center()
+      .cursor_row_resize().tooltip("Drag to resize · double-click to even out")
+      .on_mouse_down("left", (e, cx) => {
+        cx.stop_propagation();
+        if (e.click_count >= 2) { this.resize = null; setShared("board.laneWeights", null); cx.notify(); return; }
+        this.resize = { i, y: e.position.y, start: weights.slice(), weights: weights.slice() };
+        cx.notify();
+      })
+      .child(div().w_full().h(2).rounded(1)
+        .bg(this.resize?.i === i ? t.accent : "#00000000")
+        .when(this.resize === null, el => el.hover(s => s.bg(t.border))));
+    const lanes = STATES.map((state, idx) => {
       const color = t[state.key];
       const cards = sortCards(shown.filter(a => a.status === state.key));
-      return v_flex().id(`lane-${state.key}`).w_full().flex_1().min_h(0).min_w(0).overflow_hidden()
+      return v_flex().id(`lane-${state.key}`).w_full().flex_basis(0).flex_grow(weights[idx]).flex_shrink(1)
+        .min_h(LANE_MIN).min_w(0).overflow_hidden()
         .rounded(8).bg(t.surface ?? t.background).px(10).py(8).gap(8)
         .child(h_flex().h(22).flex_none().items_center().gap(7)
           .child(dot(color, 7))
@@ -479,6 +510,32 @@ export default class Board extends View {
         .child(h_flex().id(`lane-cards-${state.key}`).w_full().flex_1().min_h(0).content_start().items_start()
           .flex_wrap().gap(6).overflow_y_scrollbar()
           .children(cards.map(a => this.card(t, a, color, cards))));
-    }));
+    });
+    return v_flex().id("board-lanes").size_full().min_h(0).overflow_hidden().px(14).py(PAD_Y).bg(t.canvas)
+      .on_size_change((size, cx) => { this.lanesHeight = size.height; })
+      .on_mouse_up("left", endDrag)
+      .on_hover((hovered, cx) => { if (!hovered) endDrag(null, cx); })
+      // A handle drag follows the pointer anywhere in the window and moves height between the
+      // two lanes it sits between; the others keep theirs.
+      .on_window_mouse_move((e, cx) => {
+        const r = this.resize;
+        if (!r) return;
+        if (e.pressed_button !== "left") return endResize(cx);
+        // Event positions and on_size_change are window px; the fixed parts are logical px.
+        const free = this.lanesHeight - (2 * PAD_Y + (STATES.length - 1) * HANDLE) * zoom;
+        if (free <= 0) return;
+        const total = r.start.reduce((x, y) => x + y, 0);
+        const perPx = total / free;
+        const pair = r.start[r.i] + r.start[r.i + 1];
+        const min = Math.min(LANE_MIN * zoom * perPx, pair / 2);
+        const top = Math.max(min, Math.min(pair - min, r.start[r.i] + (e.position.y - r.y) * perPx));
+        const next = r.start.slice();
+        next[r.i] = top;
+        next[r.i + 1] = pair - top;
+        r.weights = next;
+        cx.notify();
+      })
+      .on_window_mouse_up("left", (_e, cx) => endResize(cx))
+      .children(lanes.flatMap((lane, i) => i ? [handle(i - 1), lane] : [lane]));
   }
 }

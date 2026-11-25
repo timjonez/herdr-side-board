@@ -115,7 +115,7 @@ export default class BoardHistory extends View {
     const busy = machineList().filter(m => this.loading[key(m)]).map(label);
     const failed = machineList().filter(m => this.failed[key(m)] || !ready(m)).map(label);
     const status = busy.length ? `Checking ${busy.join(", ")}…` : failed.length ? `Could not read ${failed.join(", ")}` : `${rows.length}${rows.length === 100 ? "+" : ""} sessions`;
-    return v_flex().id("board-history").track_focus(this.handle).size_full().p(16).gap(10).bg(t.popover).text_color(t.foreground)
+    return v_flex().id("board-side-history").track_focus(this.handle).size_full().p(16).gap(10).bg(t.popover).text_color(t.foreground)
       .on_key_down((e, cx) => {
         if (e.key === "escape") { closeOverlay(props()?.overlay); cx.stop_propagation(); }
         else if (e.key === "down") { this.selected = Math.min(sel + 1, rows.length - 1); cx.notify(); }
